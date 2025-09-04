@@ -1,3 +1,5 @@
+> Copy from https://github.com/w3cj/hn-summary
+
 # Hacker News Summary
 
 Summarize the articles from the front-page of hacker news.
