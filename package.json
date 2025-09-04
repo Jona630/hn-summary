@@ -9,16 +9,19 @@
 		"lint:fix": "pnpm lint --write"
 	},
 	"dependencies": {
+		"@effect/platform": "^0.90.6",
+		"@effect/schema": "^0.75.5",
 		"@extractus/feed-extractor": "^7.1.6",
 		"@mozilla/readability": "^0.6.0",
 		"dompurify": "^3.2.6",
+		"effect": "^3.17.13",
 		"hono": "^4.9.4",
 		"linkedom": "^0.18.12"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.2.2",
 		"@types/node": "^24.3.0",
-		"wrangler": "^4.4.0"
+		"wrangler": "^4.33.2"
 	},
 	"license": "MIT"
 }
