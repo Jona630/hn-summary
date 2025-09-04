@@ -8,9 +8,8 @@ import { runEffect } from "./runtime";
 import type { CloudflareBindings } from "./services/environment";
 import type {
   AppEnv,
-  ArticleWithEntry,
   ArticleProcessingResult,
-  FeedEntry,
+  ArticleWithEntry,
 } from "./types";
 
 const app = new Hono<AppEnv>();
@@ -23,7 +22,7 @@ app.use(
         <head>
           <link
             rel="stylesheet"
-            href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"
+            href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.purple.min.css"
           />
         </head>
         <body class="container">{children}</body>
