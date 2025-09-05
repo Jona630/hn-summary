@@ -150,7 +150,7 @@ export const getArticleAndSummaryEffect = (url: string) =>
   Effect.gen(function* () {
     const kvStorage = yield* KVStorage;
     const httpClient = yield* HttpClient;
-    const aiService = yield* AI;
+    // const aiService = yield* AI;
 
     // Step 1: Check cache first
     yield* Effect.logInfo(`Checking cache for article: ${url}`);
@@ -170,6 +170,7 @@ export const getArticleAndSummaryEffect = (url: string) =>
       .get(url, {
         cacheTtl: 60 * 60 * 24, // 24 hours
         cacheEverything: true,
+        timeout: 15000, // 15s timeout for article fetching
       })
       .pipe(
         Effect.mapError(
@@ -197,22 +198,22 @@ export const getArticleAndSummaryEffect = (url: string) =>
       yield* Effect.logInfo(`Successfully parsed article: ${url}`);
 
       // Step 5: Generate summary (currently placeholder)
-      const summary = yield* aiService.summarize(cleanArticle, url).pipe(
-        Effect.catchAll((error) => {
-          return Effect.as(
-            Effect.logWarning(
-              `AI summarization failed for ${url}: ${
-                error instanceof Error ? error.message : String(error)
-              }`
-            ),
-            "Summary unavailable."
-          );
-        })
-      );
+      // const summary = yield* aiService.summarize(cleanArticle, url).pipe(
+      //   Effect.catchAll((error) => {
+      //     return Effect.as(
+      //       Effect.logWarning(
+      //         `AI summarization failed for ${url}: ${
+      //           error instanceof Error ? error.message : String(error)
+      //         }`
+      //       ),
+      //       "Summary unavailable."
+      //     );
+      //   })
+      // );
 
       result = {
         article: cleanArticle,
-        summary,
+        summary: "Summary unavailable.",
       };
     } else {
       yield* Effect.logWarning(`No content extracted for article: ${url}`);

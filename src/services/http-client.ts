@@ -1,6 +1,28 @@
 import { Context, Effect, Layer } from "effect";
 import { HttpError } from "./errors";
 
+// Add timeout utility
+const withTimeout = <A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+  timeoutMs: number
+): Effect.Effect<A, E | HttpError, R> =>
+  effect.pipe(
+    Effect.timeout(`${timeoutMs} millis`),
+    Effect.mapError((error) => {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "_tag" in error &&
+        error._tag === "TimeoutException"
+      ) {
+        return new HttpError({
+          message: `Request timed out after ${timeoutMs}ms`,
+        });
+      }
+      return error as E;
+    })
+  ) as Effect.Effect<A, E | HttpError, R>;
+
 // HTTP Client service interface
 export interface HttpClientService {
   readonly get: (
@@ -9,6 +31,7 @@ export interface HttpClientService {
       cache?: any;
       cacheTtl?: number;
       cacheEverything?: boolean;
+      timeout?: number;
     }
   ) => Effect.Effect<string, HttpError>;
 
@@ -16,6 +39,7 @@ export interface HttpClientService {
     url: string,
     init?: RequestInit & {
       cf?: IncomingRequestCfProperties;
+      timeout?: number;
     }
   ) => Effect.Effect<Response, HttpError>;
 }
@@ -26,10 +50,11 @@ export class HttpClient extends Context.Tag("HttpClient")<
   HttpClientService
 >() {}
 
-// Implementation using native fetch with Cloudflare features
+// Implementation using native fetch with Cloudflare features and timeouts
 const makeHttpClientService = (): HttpClientService => ({
   get: (url: string, options = {}) =>
     Effect.gen(function* () {
+      const timeout = options.timeout || 30000; // Default 30s timeout
       const cfOptions: Partial<IncomingRequestCfProperties> = {};
 
       if (options.cacheTtl) {
@@ -40,11 +65,12 @@ const makeHttpClientService = (): HttpClientService => ({
         cfOptions.cacheEverything = options.cacheEverything;
       }
 
-      const response = yield* Effect.tryPromise({
+      const fetchEffect = Effect.tryPromise({
         try: () =>
           fetch(url, {
             cf: cfOptions,
             cache: options.cache,
+            signal: AbortSignal.timeout(timeout),
           }),
         catch: (error) =>
           new HttpError({
@@ -52,6 +78,8 @@ const makeHttpClientService = (): HttpClientService => ({
             message: `Failed to fetch '${url}': ${error}`,
           }),
       });
+
+      const response = yield* withTimeout(fetchEffect, timeout);
 
       if (!response.ok) {
         return yield* Effect.fail(
@@ -63,7 +91,7 @@ const makeHttpClientService = (): HttpClientService => ({
         );
       }
 
-      return yield* Effect.tryPromise({
+      const textEffect = Effect.tryPromise({
         try: () => response.text(),
         catch: (error) =>
           new HttpError({
@@ -71,17 +99,26 @@ const makeHttpClientService = (): HttpClientService => ({
             message: `Failed to read response text from '${url}': ${error}`,
           }),
       });
+
+      return yield* withTimeout(textEffect, 10000); // 10s timeout for reading response
     }),
 
-  fetch: (url: string, init = {}) =>
-    Effect.tryPromise({
-      try: () => fetch(url, init),
+  fetch: (url: string, init = {}) => {
+    const timeout = init.timeout || 30000; // Default 30s timeout
+    const fetchEffect = Effect.tryPromise({
+      try: () =>
+        fetch(url, {
+          ...init,
+          signal: AbortSignal.timeout(timeout),
+        }),
       catch: (error) =>
         new HttpError({
           url,
           message: `Failed to fetch '${url}': ${error}`,
         }),
-    }).pipe(
+    });
+
+    return withTimeout(fetchEffect, timeout).pipe(
       Effect.flatMap((response) => {
         if (!response.ok) {
           return Effect.fail(
@@ -94,7 +131,8 @@ const makeHttpClientService = (): HttpClientService => ({
         }
         return Effect.succeed(response);
       })
-    ),
+    );
+  },
 });
 
 // Layer for providing the HTTP client service

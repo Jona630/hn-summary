@@ -29,6 +29,7 @@ app.use(
             rel="stylesheet"
             href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.purple.min.css"
           />
+          <title>Tatu News</title>
         </head>
         <body class="container">
           <nav>
@@ -60,6 +61,9 @@ app.use(
 // Main route using Effect
 app.get("/", async (c) => {
   try {
+    const page = parseInt(c.req.query("page") || "1");
+    const itemsPerPage = 10;
+
     const bindings: CloudflareBindings = {
       summary_rss_articles: c.env.summary_rss_articles,
       AI: c.env.AI,
@@ -70,11 +74,17 @@ app.get("/", async (c) => {
       // Step 1: Fetch the HN feed
       const items = yield* getFeedEffect;
 
-      // Step 2: Process articles with concurrency control (max 5 concurrent)
+      // Step 2: Calculate pagination
+      const startIndex = (page - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const paginatedItems = items?.slice(startIndex, endIndex) || [];
+      const totalItems = items?.length || 0;
+      const totalPages = Math.ceil(totalItems / itemsPerPage);
+
+      // Step 3: Process articles with concurrency control (max 3 concurrent)
       // Use either/catchAll to handle individual failures gracefully
       const results = yield* Effect.forEach(
-        // items?.slice(0, 10) || [], // Limit to first 10 items for better performance
-        items || [],
+        paginatedItems,
         (entry) =>
           Effect.gen(function* () {
             const result: ArticleProcessingResult =
@@ -105,26 +115,50 @@ app.get("/", async (c) => {
               );
             return { entry, result };
           }),
-        { concurrency: 5 } // Process up to 5 articles concurrently
+        { concurrency: 3 } // Process up to 3 articles concurrently
       );
 
-      return results;
+      return { results, totalPages, currentPage: page, totalItems };
     }).pipe(
       Effect.withLogSpan("main-route"),
       Effect.tapBoth({
         onFailure: (error) => Effect.logError(`Main route failed: ${error}`),
-        onSuccess: (results) =>
-          Effect.logInfo(`Successfully processed ${results.length} articles`),
+        onSuccess: (data) =>
+          Effect.logInfo(
+            `Successfully processed ${data.results.length} articles on page ${data.currentPage}`
+          ),
       })
     );
 
     // Run the Effect program
-    const results = (await runEffect(program, bindings)) as ArticleWithEntry[];
+    const { results, totalPages, currentPage, totalItems } = await runEffect(
+      program,
+      bindings
+    );
 
     // Render the results
     return c.render(
       <>
         <h1>Hacker News Summary</h1>
+        <p>
+          Page {currentPage} of {totalPages} ({totalItems} total articles)
+        </p>
+        <nav style="margin-bottom: 1rem;">
+          {currentPage > 1 && (
+            <a
+              href={`/?page=${currentPage - 1}`}
+              class="contrast"
+              style="margin-right: 1rem;"
+            >
+              ← Previous
+            </a>
+          )}
+          {currentPage < totalPages && (
+            <a href={`/?page=${currentPage + 1}`} class="contrast">
+              Next →
+            </a>
+          )}
+        </nav>
         {results.map(({ entry, result }, index) => (
           <details key={entry.link}>
             {/** biome-ignore lint/a11y/useSemanticElements: using summary container */}
@@ -188,6 +222,9 @@ app.get("/", async (c) => {
 
 app.get("/the-verge", async (c) => {
   try {
+    const page = parseInt(c.req.query("page") || "1");
+    const itemsPerPage = 10;
+
     const bindings: CloudflareBindings = {
       summary_rss_articles: c.env.summary_rss_articles,
       AI: c.env.AI,
@@ -195,14 +232,20 @@ app.get("/the-verge", async (c) => {
 
     // Create the main Effect program
     const program = Effect.gen(function* () {
-      // Step 1: Fetch the HN feed
+      // Step 1: Fetch The Verge feed
       const items = yield* getTheVergeFeedEffect;
 
-      // Step 2: Process articles with concurrency control (max 5 concurrent)
+      // Step 2: Calculate pagination
+      const startIndex = (page - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const paginatedItems = items?.slice(startIndex, endIndex) || [];
+      const totalItems = items?.length || 0;
+      const totalPages = Math.ceil(totalItems / itemsPerPage);
+
+      // Step 3: Process articles with concurrency control (max 3 concurrent)
       // Use either/catchAll to handle individual failures gracefully
       const results = yield* Effect.forEach(
-        // items?.slice(0, 10) || [], // Limit to first 10 items for better performance
-        items || [],
+        paginatedItems,
         (entry) =>
           Effect.gen(function* () {
             const result: ArticleProcessingResult =
@@ -233,26 +276,50 @@ app.get("/the-verge", async (c) => {
               );
             return { entry, result };
           }),
-        { concurrency: 5 } // Process up to 5 articles concurrently
+        { concurrency: 3 } // Process up to 3 articles concurrently
       );
 
-      return results;
+      return { results, totalPages, currentPage: page, totalItems };
     }).pipe(
       Effect.withLogSpan("main-route"),
       Effect.tapBoth({
         onFailure: (error) => Effect.logError(`Main route failed: ${error}`),
-        onSuccess: (results) =>
-          Effect.logInfo(`Successfully processed ${results.length} articles`),
+        onSuccess: (data) =>
+          Effect.logInfo(
+            `Successfully processed ${data.results.length} articles on page ${data.currentPage}`
+          ),
       })
     );
 
     // Run the Effect program
-    const results = (await runEffect(program, bindings)) as ArticleWithEntry[];
+    const { results, totalPages, currentPage, totalItems } = await runEffect(
+      program,
+      bindings
+    );
 
     // Render the results
     return c.render(
       <>
         <h1>The Verge Summary</h1>
+        <p>
+          Page {currentPage} of {totalPages} ({totalItems} total articles)
+        </p>
+        <nav style="margin-bottom: 1rem;">
+          {currentPage > 1 && (
+            <a
+              href={`/the-verge?page=${currentPage - 1}`}
+              class="contrast"
+              style="margin-right: 1rem;"
+            >
+              ← Previous
+            </a>
+          )}
+          {currentPage < totalPages && (
+            <a href={`/the-verge?page=${currentPage + 1}`} class="contrast">
+              Next →
+            </a>
+          )}
+        </nav>
         {results.map(({ entry, result }, index) => (
           <details key={entry.link}>
             {/** biome-ignore lint/a11y/useSemanticElements: using summary container */}
