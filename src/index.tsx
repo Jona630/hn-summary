@@ -21,6 +21,10 @@ app.use(
       <html lang="en">
         <head>
           <link
+            rel="icon"
+            href="https://jkrdok5j3d.ufs.sh/f/jaHwekd2vgiCSeTG8yxaRfnOYq90p8kxmlH1MJGgK7Nrv5Fa"
+          />
+          <link
             rel="stylesheet"
             href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.purple.min.css"
           />
@@ -98,11 +102,33 @@ app.get("/", async (c) => {
     // Render the results
     return c.render(
       <>
+        <nav>
+          <ul>
+            <li>
+              <strong>Tatu News</strong>
+            </li>
+          </ul>
+          <ul>
+            <li>
+              <a href="/" class="contrast">
+                Hacker News
+              </a>
+            </li>
+            <li>
+              <a href="#" class="contrast">
+                TBD
+              </a>
+            </li>
+          </ul>
+        </nav>
         <h1>Hacker News Summary</h1>
-        {results.map(({ entry, result }) => (
+        {results.map(({ entry, result }, index) => (
           <details key={entry.link}>
             {/** biome-ignore lint/a11y/useSemanticElements: using summary container */}
-            <summary role="button" class="outline contrast">
+            <summary
+              role="button"
+              class={`outline ${index % 2 === 0 ? "primary" : "secondary"}`}
+            >
               {entry.title}
             </summary>
             <article>
@@ -158,13 +184,27 @@ app.get("/", async (c) => {
 });
 
 app.notFound((c) => {
-  return c.render(<h1>Not found - {c.req.path}</h1>);
+  return c.render(
+    <>
+      <h1>Not found - {c.req.path}</h1>
+      <a href="/" class="contrast">
+        back to home
+      </a>
+    </>
+  );
 });
 
 app.onError((error, c) => {
   console.error("App error:", error);
   c.status(500);
-  return c.render(<h1>Error - {error.message}</h1>);
+  return c.render(
+    <>
+      <h1>Error - {error.message}</h1>
+      <a href="/" class="contrast">
+        back to home
+      </a>
+    </>
+  );
 });
 
 export default app;
